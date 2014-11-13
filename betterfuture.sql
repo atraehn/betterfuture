@@ -246,8 +246,9 @@ DECLARE
 	total_investment FLOAT := 0.0;
 	per FLOAT;
 	share_price FLOAT;
-	num_shares INT;
+	number_of_shares INT;
 	i INT := 1;
+	shares_test INT;
 	CURSOR preferences IS SELECT symbol FROM PREFERS WHERE PREFERS.allocation_no = (SELECT MAX(ALLOCATION.allocation_no) FROM ALLOCATION WHERE ALLOCATION.login = :new.login);
 BEGIN
 	
@@ -265,29 +266,52 @@ BEGIN
 	--FROM PREFERS
 	--WHERE PREFERS.allocation_no = (SELECT MAX(ALLOCATION.allocation_no) FROM ALLOCATION WHERE ALLOCATION.login = :new.login);
 	
+	-- loop for all of the symbols or percentages in the PREFERS table
 	FOR sym IN preferences LOOP
 		
+		-- get the percentage that customer wants to allocate for this particular stock
 		SELECT percentage INTO per
 		FROM PREFERS
 		WHERE (PREFERS.allocation_no = (SELECT MAX(ALLOCATION.allocation_no) FROM ALLOCATION WHERE ALLOCATION.login = :new.login) AND PREFERS.symbol LIKE sym.symbol);
 		
+		-- get the price for this particular stock
 		SELECT price INTO share_price
 		FROM CLOSINGPRICE
 		WHERE (TO_CHAR(p_date, 'DD-Mon-YY') LIKE TO_CHAR((SELECT MAX(p_date) FROM CLOSINGPRICE WHERE CLOSINGPRICE.symbol LIKE sym.symbol), 'DD-Mon-YY') AND symbol LIKE sym.symbol);
 		
-		share_price := share_price;
+		-- calculate the number of shares this customer wants based off of share price and the amount they want to spend on this stock
+		number_of_shares := FLOOR((:new.amount*per)/share_price);
 		
-		num_shares := FLOOR((:new.amount*per)/share_price);
+		-- sum up the total investment for this deposit to use later
+		total_investment := total_investment + number_of_shares*share_price;
 		
-		total_investment := total_investment + num_shares*share_price;
-		
+		-- Fire off the new buy transactions
 		INSERT INTO TRXLOG(TRANS_ID,LOGIN,SYMBOL,T_DATE,ACTION,NUM_SHARES,PRICE,AMOUNT)
-		VALUES((:new.trans_id + i), :new.login, sym.symbol, :new.t_date, 'buy', num_shares, share_price, num_shares*share_price);
+		VALUES((:new.trans_id + i), :new.login, sym.symbol, :new.t_date, 'buy', number_of_shares, share_price, number_of_shares*share_price);
 		i:=i+1;
 		COMMIT;
+		
+		-- Add newly bought stocks to OWN table
+		BEGIN
+			SELECT shares INTO shares_test
+			FROM OWNS
+			WHERE OWNS.symbol LIKE sym.symbol AND OWNS.login = :new.login;
+		EXCEPTION 
+			WHEN NO_DATA_FOUND THEN NULL;
+		END;
+		
+		IF shares_test IS NOT NULL THEN
+			UPDATE OWNS 
+			SET shares = shares + number_of_shares
+			WHERE OWNS.symbol LIKE sym.symbol AND OWNS.login = :new.login;
+		ELSE
+			INSERT INTO OWNS(login, symbol, shares) VALUES (:new.login, sym.symbol, number_of_shares);
+		END IF;
+		COMMIT;
+		
 	END LOOP;
 	
-	-- Update Customer's total balance
+	-- Update Customer's total balance, basically adding (amount_deposited - total_invested)
 	UPDATE CUSTOMER
 	SET balance = balance + :new.amount - total_investment
 	WHERE CUSTOMER.login = :new.login;
@@ -310,11 +334,27 @@ CREATE OR REPLACE TRIGGER SHARES_SOLD
 AFTER INSERT ON TRXLOG
 FOR EACH ROW WHEN (new.action LIKE 'sell')
 DECLARE
+	number_of_shares INT;
 BEGIN
 	-- Update Customer's total balance by added sold shares
 	UPDATE CUSTOMER
 	SET balance = balance + :new.amount
 	WHERE CUSTOMER.login = :new.login;
+	
+	-- Assume Customer has the stock and subtract it from owns
+	UPDATE OWNS 
+	SET shares = shares - :new.num_shares
+	WHERE OWNS.symbol LIKE :new.symbol AND OWNS.login = :new.login;
+	
+	SELECT shares INTO number_of_shares 
+	FROM OWNS
+	WHERE OWNS.symbol LIKE :new.symbol AND OWNS.login = :new.login;
+	
+	-- if there are no more of the sold shares owned by the customer, remove that row from the table
+	IF number_of_shares = 0 THEN
+		DELETE FROM OWNS
+		WHERE OWNS.symbol LIKE :new.symbol AND OWNS.login = :new.login;
+	END IF;
 END;
 /
 
@@ -342,3 +382,5 @@ COMMIT;
 SELECT * FROM TRXLOG;
 
 SELECT * FROM CUSTOMER;
+
+SELECT * FROM OWNS;
