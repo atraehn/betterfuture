@@ -7,6 +7,7 @@
 
 --purge recycle bin to ensure space for drops
 purge recyclebin;
+alter session set recyclebin = off;
 
 --drop old tables to create new ones
 drop table MUTUALFUND cascade constraints;
@@ -23,53 +24,53 @@ drop table MUTUALDATE cascade constraints;
 ---------------------------TABLES BELOW--------------------------------
 -----------------------------------------------------------------------
 create table MUTUALFUND(
-symbol 	varchar2(24)	not null,
-name	varchar2(32)	not null,
+symbol		varchar2(24)	not null,
+name		varchar2(32)	not null,
 description	varchar2(108) 	not null,
 category	varchar2(16) 	not null,
-c_date		date		not null,
+c_date		date			not null,
 CONSTRAINT MUTUALFUND_PK PRIMARY KEY (symbol) INITIALLY IMMEDIATE DEFERRABLE
 );
 
 create table CLOSINGPRICE(
 symbol	varchar2(24) 	not null,
-price	float 		not null,
-p_date	date		not null,
+price	float 			not null,
+p_date	date			not null,
 CONSTRAINT CLOSINGPRICE_PK PRIMARY KEY (symbol,p_date) INITIALLY IMMEDIATE DEFERRABLE,
 CONSTRAINT CLOSINGPRICE_FK FOREIGN KEY (symbol) REFERENCES MUTUALFUND(symbol) INITIALLY IMMEDIATE DEFERRABLE
 );
 
 create table CUSTOMER(
-login	varchar2(16) 	not null,
-name	varchar2(24)	not null,
-email	varchar2(24)	not null,
-address	varchar2(32)	not null,
+login		varchar2(16) 	not null,
+name		varchar2(24)	not null,
+email		varchar2(24)	not null,
+address		varchar2(32)	not null,
 password	varchar2(16) 	not null,
-balance float not null,
+balance 	float 			not null,
 CONSTRAINT CUSTOMER_PK PRIMARY KEY (login) INITIALLY IMMEDIATE DEFERRABLE
 );
 
 create table ADMINISTRATOR(
-login 	varchar2(16) 	not null,
-name 	varchar2(24)	not null,
-email	varchar2(24)	not null,
-address	varchar2(32)	not null,
+login 		varchar2(16) 	not null,
+name 		varchar2(24)	not null,
+email		varchar2(24)	not null,
+address		varchar2(32)	not null,
 password	varchar2(16)	not null,
 CONSTRAINT ADMINISTRATOR_PK PRIMARY KEY (login) INITIALLY IMMEDIATE DEFERRABLE
 );
 
 create table ALLOCATION(
-allocation_no	int	not null,
-login	varchar2(16)	not null,
-p_date	date	not null,
+allocation_no	int				not null,
+login			varchar2(16)	not null,
+p_date			date			not null,
 CONSTRAINT ALLOCATION_PK PRIMARY KEY (allocation_no) INITIALLY IMMEDIATE DEFERRABLE,
 CONSTRAINT ALLOCATION_FK FOREIGN KEY (login) REFERENCES CUSTOMER(login) INITIALLY IMMEDIATE DEFERRABLE
 );
 
 create table PREFERS(
-allocation_no	int	not null,
-symbol	varchar2(24)	not null,
-percentage	float	not null,
+allocation_no	int				not null,
+symbol			varchar2(24)	not null,
+percentage		float			not null,
 CONSTRAINT PREFERS_PK PRIMARY KEY (allocation_no,symbol) INITIALLY IMMEDIATE DEFERRABLE,
 CONSTRAINT PREFERS_FK1 FOREIGN KEY (allocation_no) REFERENCES ALLOCATION(allocation_no) INITIALLY IMMEDIATE DEFERRABLE,
 CONSTRAINT PREFERS_FK2 FOREIGN KEY (symbol) REFERENCES MUTUALFUND(symbol) INITIALLY IMMEDIATE DEFERRABLE
@@ -77,22 +78,23 @@ CONSTRAINT PREFERS_FK2 FOREIGN KEY (symbol) REFERENCES MUTUALFUND(symbol) INITIA
 
 create table TRXLOG(
 trans_id	int	not null,
-login	varchar2(16)	not null,
-symbol	varchar2(24),
-t_date	date	not null,
-action	varchar2(16)	not null,
+login		varchar2(16)	not null,
+symbol		varchar2(24),
+t_date		date			not null,
+action		varchar2(16)	not null,
 num_shares	int,
-price	float,
-amount	float not null,
+price		float,
+amount		float 			not null,
 CONSTRAINT TRXLOG_PK PRIMARY KEY (trans_id) INITIALLY IMMEDIATE DEFERRABLE,
 CONSTRAINT TRXLOG_FK1 FOREIGN KEY (login) REFERENCES CUSTOMER(login) INITIALLY IMMEDIATE DEFERRABLE,
-CONSTRAINT TRXLOG_FK2 FOREIGN KEY (symbol) REFERENCES MUTUALFUND(symbol) INITIALLY IMMEDIATE DEFERRABLE
+CONSTRAINT TRXLOG_FK2 FOREIGN KEY (symbol) REFERENCES MUTUALFUND(symbol) INITIALLY IMMEDIATE DEFERRABLE,
+CONSTRAINT ACTION_CHECK CHECK (action LIKE 'deposit' OR action LIKE 'sell' OR action LIKE 'buy') INITIALLY IMMEDIATE DEFERRABLE
 );
 
 create table OWNS(
 login	varchar2(16)	not null,
 symbol	varchar2(24)	not null,
-shares	int	not null,
+shares	int				not null,
 CONSTRAINT OWNS_PK PRIMARY KEY (login,symbol) INITIALLY IMMEDIATE DEFERRABLE,
 CONSTRAINT OWNS_FK1 FOREIGN KEY (login) REFERENCES CUSTOMER(login) INITIALLY IMMEDIATE DEFERRABLE,
 CONSTRAINT OWNS_FK2 FOREIGN KEY (symbol) REFERENCES MUTUALFUND(symbol) INITIALLY IMMEDIATE DEFERRABLE
@@ -112,8 +114,12 @@ CONSTRAINT MUTUALDATE_PK PRIMARY KEY (c_date) INITIALLY IMMEDIATE DEFERRABLE
 -----------------------------------------------------------------------
 insert into MUTUALDATE(c_date) values('04-APR-14');
 
+COMMIT;
+
 insert into CUSTOMER(LOGIN,NAME,EMAIL,ADDRESS,PASSWORD,BALANCE) values('mike','Mike','mike@betterfuture.com','1st street','pwd',750);
 insert into CUSTOMER(LOGIN,NAME,EMAIL,ADDRESS,PASSWORD,BALANCE) values('mary','Mary','mary@betterfuture.com','2st street','pwd',0);
+
+COMMIT;
 
 insert into Administrator(LOGIN,NAME,EMAIL,ADDRESS,PASSWORD) values('admin','Administrator','admin@betterfuture.com','5th Ave, Pitt','root');
 
@@ -127,16 +133,24 @@ insert into MutualFund(SYMBOL,NAME,DESCRIPTION,CATEGORY,C_DATE) values('GS','gen
 insert into MutualFund(SYMBOL,NAME,DESCRIPTION,CATEGORY,C_DATE) values('AS','aggressive-stocks','aggressive stocks','stocks','23-JAN-14');
 insert into MutualFund(SYMBOL,NAME,DESCRIPTION,CATEGORY,C_DATE) values('IMS','international-markets-stock','international markets stock, risky','stocks','30-JAN-14');
 
+COMMIT;
+
 insert into Owns(LOGIN,SYMBOL,SHARES) values('mike','RE',50);
+
+COMMIT;
 
 insert into TRXLOG(TRANS_ID,LOGIN,SYMBOL,T_DATE,ACTION,NUM_SHARES,PRICE,AMOUNT) values(0,'mike',NULL,'29-MAR-14','deposit',NULL,NULL,1000);
 insert into TRXLOG(TRANS_ID,LOGIN,SYMBOL,T_DATE,ACTION,NUM_SHARES,PRICE,AMOUNT) values(1,'mike','MM','29-MAR-14','buy',50,10,500);
 insert into TRXLOG(TRANS_ID,LOGIN,SYMBOL,T_DATE,ACTION,NUM_SHARES,PRICE,AMOUNT) values(2,'mike','RE','29-MAR-14','buy',50,10,500);
 insert into TRXLOG(TRANS_ID,LOGIN,SYMBOL,T_DATE,ACTION,NUM_SHARES,PRICE,AMOUNT) values(3,'mike','MM','01-APR-14','sell',50,15,750);
 
+COMMIT;
+
 insert into Allocation(ALLOCATION_NO,LOGIN,P_DATE) values(0,'mike','28-MAR-14');
 insert into Allocation(ALLOCATION_NO,LOGIN,P_DATE) values(1,'mary','29-MAR-14');
 insert into Allocation(ALLOCATION_NO,LOGIN,P_DATE) values(2,'mike','03-APR-14');
+
+COMMIT;
 
 insert into Prefers(ALLOCATION_NO,SYMBOL,PERCENTAGE) values(0,'MM',.5);
 insert into Prefers(ALLOCATION_NO,SYMBOL,PERCENTAGE) values(0,'RE',.5);
@@ -146,6 +160,8 @@ insert into Prefers(ALLOCATION_NO,SYMBOL,PERCENTAGE) values(1,'BBS',.4);
 insert into Prefers(ALLOCATION_NO,SYMBOL,PERCENTAGE) values(2,'GS',.3);
 insert into Prefers(ALLOCATION_NO,SYMBOL,PERCENTAGE) values(2,'AS',.3);
 insert into Prefers(ALLOCATION_NO,SYMBOL,PERCENTAGE) values(2,'IMS',.4);
+
+COMMIT;
 
 insert into ClosingPrice(SYMBOL,PRICE,P_DATE) values('MM',10,'28-MAR-14');
 insert into ClosingPrice(SYMBOL,PRICE,P_DATE) values('MM',11,'29-MAR-14');
@@ -211,10 +227,118 @@ insert into ClosingPrice(SYMBOL,PRICE,P_DATE) values('IMS',13,'01-APR-14');
 insert into ClosingPrice(SYMBOL,PRICE,P_DATE) values('IMS',12,'02-APR-14');                                       
 insert into ClosingPrice(SYMBOL,PRICE,P_DATE) values('IMS',11,'03-APR-14');
 
-commit;
+COMMIT;
 
 -----------------------------------------------------------------------
 ---------------------------INSERTS ABOVE-------------------------------
 -----------------------------------------------------------------------
 
 
+-----------------------------------------------------------------------
+---------------------------TRIGGERS BELOW------------------------------
+-----------------------------------------------------------------------
+
+CREATE OR REPLACE TRIGGER DEPOSIT_MADE
+AFTER INSERT ON TRXLOG
+FOR EACH ROW WHEN (new.action LIKE 'deposit')
+DECLARE
+	PRAGMA AUTONOMOUS_TRANSACTION;
+	total_investment FLOAT := 0.0;
+	per FLOAT;
+	share_price FLOAT;
+	num_shares INT;
+	i INT := 1;
+	CURSOR preferences IS SELECT symbol FROM PREFERS WHERE PREFERS.allocation_no = (SELECT MAX(ALLOCATION.allocation_no) FROM ALLOCATION WHERE ALLOCATION.login = :new.login);
+BEGIN
+	
+	--UPDATE CUSTOMER
+	--SET name = 'tim'
+	--WHERE login = :new.login;
+	
+	--SELECT s:= symbol, p:= percentage FROM PREFERS;
+	
+	--INSERT INTO TRXLOG(TRANS_ID,LOGIN,SYMBOL,T_DATE,ACTION,NUM_SHARES,PRICE,AMOUNT)
+	--SELECT (TRXLOG.trans_id + i:=i+1), TRXLOG.login, NULL, TRXLOG.t_date, 'buy', NULL, NULL, TRXLOG.amount*percent
+	--FROM PREFERS WHERE allocation_no = 2 AND symbol = 'GS';
+	
+	--SELECT COUNT(percentage) INTO num_percents
+	--FROM PREFERS
+	--WHERE PREFERS.allocation_no = (SELECT MAX(ALLOCATION.allocation_no) FROM ALLOCATION WHERE ALLOCATION.login = :new.login);
+	
+	FOR sym IN preferences LOOP
+		
+		SELECT percentage INTO per
+		FROM PREFERS
+		WHERE (PREFERS.allocation_no = (SELECT MAX(ALLOCATION.allocation_no) FROM ALLOCATION WHERE ALLOCATION.login = :new.login) AND PREFERS.symbol LIKE sym.symbol);
+		
+		SELECT price INTO share_price
+		FROM CLOSINGPRICE
+		WHERE (TO_CHAR(p_date, 'DD-Mon-YY') LIKE TO_CHAR((SELECT MAX(p_date) FROM CLOSINGPRICE WHERE CLOSINGPRICE.symbol LIKE sym.symbol), 'DD-Mon-YY') AND symbol LIKE sym.symbol);
+		
+		share_price := share_price;
+		
+		num_shares := FLOOR((:new.amount*per)/share_price);
+		
+		total_investment := total_investment + num_shares*share_price;
+		
+		INSERT INTO TRXLOG(TRANS_ID,LOGIN,SYMBOL,T_DATE,ACTION,NUM_SHARES,PRICE,AMOUNT)
+		VALUES((:new.trans_id + i), :new.login, sym.symbol, :new.t_date, 'buy', num_shares, share_price, num_shares*share_price);
+		i:=i+1;
+		COMMIT;
+	END LOOP;
+	
+	-- Update Customer's total balance
+	UPDATE CUSTOMER
+	SET balance = balance + :new.amount - total_investment
+	WHERE CUSTOMER.login = :new.login;
+	
+	COMMIT;
+	
+	--WHILE i<=num_percents LOOP
+	--	SELECT percentage INTO p
+	--	FROM PREFERS, ALLOCATION
+	--	WHERE (PREFERS.allocation_no = ALLOCATION.allocation_no AND ALLOCATION.allocation_no = 2 AND PREFERS.symbol = 'GS');
+	--	INSERT INTO TRXLOG(TRANS_ID,LOGIN,SYMBOL,T_DATE,ACTION,NUM_SHARES,PRICE,AMOUNT)
+	--	VALUES((:new.trans_id + i), :new.login, NULL, :new.t_date, 'buy', NULL, NULL, :new.amount*p);
+	--	commit;
+	--	i:=i+1;
+	--END LOOP;
+END;
+/
+
+CREATE OR REPLACE TRIGGER SHARES_SOLD
+AFTER INSERT ON TRXLOG
+FOR EACH ROW WHEN (new.action LIKE 'sell')
+DECLARE
+BEGIN
+	-- Update Customer's total balance by added sold shares
+	UPDATE CUSTOMER
+	SET balance = balance + :new.amount
+	WHERE CUSTOMER.login = :new.login;
+END;
+/
+
+-----------------------------------------------------------------------
+---------------------------TRIGGERS ABOVE------------------------------
+-----------------------------------------------------------------------
+
+
+-----------------------------------------------------------------------
+----------------WE NEED TO MAKE FUNCTION AND SHIT HERE-----------------
+-----------------------------------------------------------------------
+
+insert into TRXLOG(TRANS_ID,LOGIN,SYMBOL,T_DATE,ACTION,NUM_SHARES,PRICE,AMOUNT)
+values(5, 'mike', 'MM', '04-APR-14', 'deposit', NULL, NULL, 750);
+COMMIT;
+
+SELECT * FROM TRXLOG;
+
+SELECT * FROM CUSTOMER;
+
+insert into TRXLOG(TRANS_ID,LOGIN,SYMBOL,T_DATE,ACTION,NUM_SHARES,PRICE,AMOUNT)
+values(9, 'mike', 'IMS', '04-APR-14', 'sell', 27, 11, 297);
+COMMIT;
+
+SELECT * FROM TRXLOG;
+
+SELECT * FROM CUSTOMER;
