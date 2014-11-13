@@ -235,6 +235,60 @@ COMMIT;
 
 
 -----------------------------------------------------------------------
+---------------------FUNCTIONS/PROCEDURES BELOW------------------------
+-----------------------------------------------------------------------
+
+CREATE OR REPLACE PROCEDURE GET_DEPOSIT_INFO (c_login IN VARCHAR2, c_symbol IN VARCHAR2, amount IN FLOAT, 
+	per OUT FLOAT, share_price OUT FLOAT, number_of_shares OUT INT)
+AS
+BEGIN
+	-- get the percentage that customer wants to allocate for this particular stock
+	SELECT percentage INTO per
+	FROM PREFERS
+	WHERE (PREFERS.allocation_no = (SELECT MAX(ALLOCATION.allocation_no) FROM ALLOCATION WHERE ALLOCATION.login = c_login) AND PREFERS.symbol LIKE c_symbol);
+	
+	-- get the price for this particular stock
+	SELECT price INTO share_price
+	FROM CLOSINGPRICE
+	WHERE (TO_CHAR(p_date, 'DD-Mon-YY') LIKE TO_CHAR((SELECT MAX(p_date) FROM CLOSINGPRICE WHERE CLOSINGPRICE.symbol LIKE c_symbol), 'DD-Mon-YY') AND symbol LIKE c_symbol);
+	
+	-- calculate the number of shares this customer wants based off of share price and the amount they want to spend on this stock
+	number_of_shares := FLOOR((amount*per)/share_price);
+	
+END GET_DEPOSIT_INFO;
+/
+--SHOW ERRORS;
+
+CREATE OR REPLACE PROCEDURE ADD_STOCK_TO_OWNS (c_login IN VARCHAR2, c_symbol IN VARCHAR2, number_of_shares IN INT)
+AS
+shares_test INT;
+BEGIN
+	BEGIN
+		SELECT shares INTO shares_test
+		FROM OWNS
+		WHERE OWNS.symbol LIKE c_symbol AND OWNS.login = c_login;
+	EXCEPTION 
+		WHEN NO_DATA_FOUND THEN NULL;
+	END;
+	
+	IF shares_test IS NOT NULL THEN
+		UPDATE OWNS 
+		SET shares = shares + number_of_shares
+		WHERE OWNS.symbol LIKE c_symbol AND OWNS.login = c_login;
+	ELSE
+		INSERT INTO OWNS(login, symbol, shares) VALUES (c_login, c_symbol, number_of_shares);
+	END IF;
+	COMMIT;
+END ADD_STOCK_TO_OWNS;
+/
+SHOW ERRORS;
+
+-----------------------------------------------------------------------
+---------------------FUNCTIONS/PROCEDURES ABOVE------------------------
+-----------------------------------------------------------------------
+
+
+-----------------------------------------------------------------------
 ---------------------------TRIGGERS BELOW------------------------------
 -----------------------------------------------------------------------
 
@@ -252,35 +306,11 @@ DECLARE
 	CURSOR preferences IS SELECT symbol FROM PREFERS WHERE PREFERS.allocation_no = (SELECT MAX(ALLOCATION.allocation_no) FROM ALLOCATION WHERE ALLOCATION.login = :new.login);
 BEGIN
 	
-	--UPDATE CUSTOMER
-	--SET name = 'tim'
-	--WHERE login = :new.login;
-	
-	--SELECT s:= symbol, p:= percentage FROM PREFERS;
-	
-	--INSERT INTO TRXLOG(TRANS_ID,LOGIN,SYMBOL,T_DATE,ACTION,NUM_SHARES,PRICE,AMOUNT)
-	--SELECT (TRXLOG.trans_id + i:=i+1), TRXLOG.login, NULL, TRXLOG.t_date, 'buy', NULL, NULL, TRXLOG.amount*percent
-	--FROM PREFERS WHERE allocation_no = 2 AND symbol = 'GS';
-	
-	--SELECT COUNT(percentage) INTO num_percents
-	--FROM PREFERS
-	--WHERE PREFERS.allocation_no = (SELECT MAX(ALLOCATION.allocation_no) FROM ALLOCATION WHERE ALLOCATION.login = :new.login);
-	
 	-- loop for all of the symbols or percentages in the PREFERS table
 	FOR sym IN preferences LOOP
 		
-		-- get the percentage that customer wants to allocate for this particular stock
-		SELECT percentage INTO per
-		FROM PREFERS
-		WHERE (PREFERS.allocation_no = (SELECT MAX(ALLOCATION.allocation_no) FROM ALLOCATION WHERE ALLOCATION.login = :new.login) AND PREFERS.symbol LIKE sym.symbol);
-		
-		-- get the price for this particular stock
-		SELECT price INTO share_price
-		FROM CLOSINGPRICE
-		WHERE (TO_CHAR(p_date, 'DD-Mon-YY') LIKE TO_CHAR((SELECT MAX(p_date) FROM CLOSINGPRICE WHERE CLOSINGPRICE.symbol LIKE sym.symbol), 'DD-Mon-YY') AND symbol LIKE sym.symbol);
-		
-		-- calculate the number of shares this customer wants based off of share price and the amount they want to spend on this stock
-		number_of_shares := FLOOR((:new.amount*per)/share_price);
+		-- get stock info for this particular preference
+		GET_DEPOSIT_INFO(:new.login, sym.symbol, :new.amount, per, share_price, number_of_shares);
 		
 		-- sum up the total investment for this deposit to use later
 		total_investment := total_investment + number_of_shares*share_price;
@@ -291,23 +321,8 @@ BEGIN
 		i:=i+1;
 		COMMIT;
 		
-		-- Add newly bought stocks to OWN table
-		BEGIN
-			SELECT shares INTO shares_test
-			FROM OWNS
-			WHERE OWNS.symbol LIKE sym.symbol AND OWNS.login = :new.login;
-		EXCEPTION 
-			WHEN NO_DATA_FOUND THEN NULL;
-		END;
-		
-		IF shares_test IS NOT NULL THEN
-			UPDATE OWNS 
-			SET shares = shares + number_of_shares
-			WHERE OWNS.symbol LIKE sym.symbol AND OWNS.login = :new.login;
-		ELSE
-			INSERT INTO OWNS(login, symbol, shares) VALUES (:new.login, sym.symbol, number_of_shares);
-		END IF;
-		COMMIT;
+		-- Add newly bought stocks to OWNS table
+		ADD_STOCK_TO_OWNS(:new.login, sym.symbol, number_of_shares);
 		
 	END LOOP;
 	
@@ -317,18 +332,9 @@ BEGIN
 	WHERE CUSTOMER.login = :new.login;
 	
 	COMMIT;
-	
-	--WHILE i<=num_percents LOOP
-	--	SELECT percentage INTO p
-	--	FROM PREFERS, ALLOCATION
-	--	WHERE (PREFERS.allocation_no = ALLOCATION.allocation_no AND ALLOCATION.allocation_no = 2 AND PREFERS.symbol = 'GS');
-	--	INSERT INTO TRXLOG(TRANS_ID,LOGIN,SYMBOL,T_DATE,ACTION,NUM_SHARES,PRICE,AMOUNT)
-	--	VALUES((:new.trans_id + i), :new.login, NULL, :new.t_date, 'buy', NULL, NULL, :new.amount*p);
-	--	commit;
-	--	i:=i+1;
-	--END LOOP;
 END;
 /
+--SHOW ERRORS;
 
 CREATE OR REPLACE TRIGGER SHARES_SOLD
 AFTER INSERT ON TRXLOG
