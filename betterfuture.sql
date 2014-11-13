@@ -238,26 +238,45 @@ COMMIT;
 ---------------------FUNCTIONS/PROCEDURES BELOW------------------------
 -----------------------------------------------------------------------
 
-CREATE OR REPLACE PROCEDURE GET_DEPOSIT_INFO (c_login IN VARCHAR2, c_symbol IN VARCHAR2, amount IN FLOAT, 
-	per OUT FLOAT, share_price OUT FLOAT, number_of_shares OUT INT)
-AS
+CREATE OR REPLACE FUNCTION GET_SHARE_PRICE (c_symbol IN VARCHAR2)
+	RETURN FLOAT IS share_price FLOAT;
 BEGIN
-	-- get the percentage that customer wants to allocate for this particular stock
-	SELECT percentage INTO per
-	FROM PREFERS
-	WHERE (PREFERS.allocation_no = (SELECT MAX(ALLOCATION.allocation_no) FROM ALLOCATION WHERE ALLOCATION.login = c_login) AND PREFERS.symbol LIKE c_symbol);
-	
-	-- get the price for this particular stock
 	SELECT price INTO share_price
 	FROM CLOSINGPRICE
 	WHERE (TO_CHAR(p_date, 'DD-Mon-YY') LIKE TO_CHAR((SELECT MAX(p_date) FROM CLOSINGPRICE WHERE CLOSINGPRICE.symbol LIKE c_symbol), 'DD-Mon-YY') AND symbol LIKE c_symbol);
 	
-	-- calculate the number of shares this customer wants based off of share price and the amount they want to spend on this stock
-	number_of_shares := FLOOR((amount*per)/share_price);
+	RETURN(share_price);
+END;
+/
+SHOW ERRORS;
+
+CREATE OR REPLACE FUNCTION GET_PERCENTAGE (c_login IN VARCHAR, c_symbol IN VARCHAR2)
+	RETURN FLOAT IS percent FLOAT;
+BEGIN
+	SELECT percentage INTO percent
+	FROM PREFERS
+	WHERE (PREFERS.allocation_no = (SELECT MAX(ALLOCATION.allocation_no) FROM ALLOCATION WHERE ALLOCATION.login = c_login) AND PREFERS.symbol LIKE c_symbol);
 	
+	RETURN(percent);
+END;
+/
+SHOW ERRORS;
+
+CREATE OR REPLACE PROCEDURE GET_DEPOSIT_INFO (c_login IN VARCHAR2, c_symbol IN VARCHAR2, amount IN FLOAT, 
+	percent OUT FLOAT, share_price OUT FLOAT, number_of_shares OUT INT)
+AS
+BEGIN
+	-- get the percentage that customer wants to allocate for this particular stock
+	percent := GET_PERCENTAGE(c_login, c_symbol);
+	
+	-- get the price for this particular stock
+	share_price := GET_SHARE_PRICE(c_symbol);
+	
+	-- calculate the number of shares this customer wants based off of share price and the amount they want to spend on this stock
+	number_of_shares := FLOOR((amount*percent)/share_price);
 END GET_DEPOSIT_INFO;
 /
---SHOW ERRORS;
+SHOW ERRORS;
 
 CREATE OR REPLACE PROCEDURE ADD_STOCK_TO_OWNS (c_login IN VARCHAR2, c_symbol IN VARCHAR2, number_of_shares IN INT)
 AS
@@ -298,33 +317,56 @@ FOR EACH ROW WHEN (new.action LIKE 'deposit')
 DECLARE
 	PRAGMA AUTONOMOUS_TRANSACTION;
 	total_investment FLOAT := 0.0;
-	per FLOAT;
+	percent FLOAT;
 	share_price FLOAT;
 	number_of_shares INT;
 	i INT := 1;
 	shares_test INT;
-	CURSOR preferences IS SELECT symbol FROM PREFERS WHERE PREFERS.allocation_no = (SELECT MAX(ALLOCATION.allocation_no) FROM ALLOCATION WHERE ALLOCATION.login = :new.login);
+	enough_money BOOLEAN := TRUE;
+	CURSOR preference_list IS SELECT symbol FROM PREFERS WHERE PREFERS.allocation_no = (SELECT MAX(ALLOCATION.allocation_no) FROM ALLOCATION WHERE ALLOCATION.login = :new.login);
 BEGIN
+	-- check if the customer has enough money to invest in all of their preferred stocks
+	FOR sym in preference_list LOOP
 	
-	-- loop for all of the symbols or percentages in the PREFERS table
-	FOR sym IN preferences LOOP
+		-- get the price for this particular stock
+		share_price := GET_SHARE_PRICE(sym.symbol);
 		
-		-- get stock info for this particular preference
-		GET_DEPOSIT_INFO(:new.login, sym.symbol, :new.amount, per, share_price, number_of_shares);
+		-- get the percentage that customer wants to allocate for this particular stock
+		percent := GET_PERCENTAGE(:new.login, sym.symbol);
 		
-		-- sum up the total investment for this deposit to use later
-		total_investment := total_investment + number_of_shares*share_price;
-		
-		-- Fire off the new buy transactions
-		INSERT INTO TRXLOG(TRANS_ID,LOGIN,SYMBOL,T_DATE,ACTION,NUM_SHARES,PRICE,AMOUNT)
-		VALUES((:new.trans_id + i), :new.login, sym.symbol, :new.t_date, 'buy', number_of_shares, share_price, number_of_shares*share_price);
-		i:=i+1;
-		COMMIT;
-		
-		-- Add newly bought stocks to OWNS table
-		ADD_STOCK_TO_OWNS(:new.login, sym.symbol, number_of_shares);
+		-- If the customer does not have enough money to buy at least one stock based off his preference
+		IF (:new.amount*percent < share_price) THEN
+			enough_money := FALSE;
+		END IF;
 		
 	END LOOP;
+	
+	-- If the customer has enough money to go through with the transaction
+	IF (enough_money = TRUE) THEN
+	
+		-- loop for all of the symbols or percentages in the PREFERS table
+		FOR sym IN preference_list LOOP
+			
+			-- get stock info for this particular preference
+			GET_DEPOSIT_INFO(:new.login, sym.symbol, :new.amount, percent, share_price, number_of_shares);
+			
+			-- sum up the total investment for this deposit to use later
+			total_investment := total_investment + number_of_shares*share_price;
+			
+			-- Fire off the new buy transactions
+			INSERT INTO TRXLOG(TRANS_ID,LOGIN,SYMBOL,T_DATE,ACTION,NUM_SHARES,PRICE,AMOUNT)
+			VALUES((:new.trans_id + i), :new.login, sym.symbol, :new.t_date, 'buy', number_of_shares, share_price, number_of_shares*share_price);
+			i:=i+1;
+			COMMIT;
+			
+			-- Add newly bought stocks to OWNS table
+			ADD_STOCK_TO_OWNS(:new.login, sym.symbol, number_of_shares);
+			
+		END LOOP;
+	-- The customer did not have enough money to buy all of the stocks
+	ELSE
+		total_investment := 0;
+	END IF;
 	
 	-- Update Customer's total balance, basically adding (amount_deposited - total_invested)
 	UPDATE CUSTOMER
@@ -334,7 +376,7 @@ BEGIN
 	COMMIT;
 END;
 /
---SHOW ERRORS;
+SHOW ERRORS;
 
 CREATE OR REPLACE TRIGGER SHARES_SOLD
 AFTER INSERT ON TRXLOG
@@ -363,6 +405,7 @@ BEGIN
 	END IF;
 END;
 /
+SHOW ERRORS;
 
 -----------------------------------------------------------------------
 ---------------------------TRIGGERS ABOVE------------------------------
@@ -373,16 +416,36 @@ END;
 ----------------WE NEED TO MAKE FUNCTION AND SHIT HERE-----------------
 -----------------------------------------------------------------------
 
+-- deposit 750 into mike's account
 insert into TRXLOG(TRANS_ID,LOGIN,SYMBOL,T_DATE,ACTION,NUM_SHARES,PRICE,AMOUNT)
-values(5, 'mike', 'MM', '04-APR-14', 'deposit', NULL, NULL, 750);
+values(5, 'mike', NULL, '04-APR-14', 'deposit', NULL, NULL, 750);
 COMMIT;
 
 SELECT * FROM TRXLOG;
 
 SELECT * FROM CUSTOMER;
 
+-- sell 27 of mike's IMS stocks
 insert into TRXLOG(TRANS_ID,LOGIN,SYMBOL,T_DATE,ACTION,NUM_SHARES,PRICE,AMOUNT)
 values(9, 'mike', 'IMS', '04-APR-14', 'sell', 27, 11, 297);
+COMMIT;
+
+SELECT * FROM TRXLOG;
+
+SELECT * FROM CUSTOMER;
+
+-- test a deposit of  less than the needed amount of money to buy all of stock (for example AS is 18 per stock, and 50*.3=15, so money is simply deposited)
+insert into TRXLOG(TRANS_ID,LOGIN,SYMBOL,T_DATE,ACTION,NUM_SHARES,PRICE,AMOUNT)
+values(10, 'mike', NULL, '04-APR-14', 'deposit', NULL, NULL, 50);
+COMMIT;
+
+SELECT * FROM TRXLOG;
+
+SELECT * FROM CUSTOMER;
+
+-- test a deposit of just enough money to buy one stock of problematic stock above
+insert into TRXLOG(TRANS_ID,LOGIN,SYMBOL,T_DATE,ACTION,NUM_SHARES,PRICE,AMOUNT)
+values(11, 'mike', NULL, '04-APR-14', 'deposit', NULL, NULL, 60);
 COMMIT;
 
 SELECT * FROM TRXLOG;
