@@ -262,6 +262,18 @@ END;
 /
 SHOW ERRORS;
 
+CREATE OR REPLACE FUNCTION GET_NUMBER_OF_SHARES(c_login IN VARCHAR2, c_symbol IN VARCHAR2)
+RETURN INT AS number_of_shares INT;
+BEGIN
+	SELECT shares INTO number_of_shares
+	FROM OWNS
+	WHERE OWNS.symbol LIKE c_symbol AND OWNS.login LIKE c_login;
+	
+	RETURN (number_of_shares);
+END;
+/
+SHOW ERRORS;
+
 CREATE OR REPLACE PROCEDURE GET_DEPOSIT_INFO (c_login IN VARCHAR2, c_symbol IN VARCHAR2, amount IN FLOAT, 
 	percent OUT FLOAT, share_price OUT FLOAT, number_of_shares OUT INT)
 AS
@@ -394,9 +406,7 @@ BEGIN
 	SET shares = shares - :new.num_shares
 	WHERE OWNS.symbol LIKE :new.symbol AND OWNS.login = :new.login;
 	
-	SELECT shares INTO number_of_shares 
-	FROM OWNS
-	WHERE OWNS.symbol LIKE :new.symbol AND OWNS.login = :new.login;
+	number_of_shares := GET_NUMBER_OF_SHARES(:new.login, :new.symbol);
 	
 	-- if there are no more of the sold shares owned by the customer, remove that row from the table
 	IF number_of_shares = 0 THEN
