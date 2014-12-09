@@ -23,7 +23,7 @@
 import java.sql.*;  //import the file containing definitions for the parts
                     //needed by java for database connection and manipulation
 
-public class JavaDemo
+public class BetterFuture
 {
   private Connection connection; 	//used to hold the jdbc connection to the DB
   private Statement statement; 		//used to create an instance of the connection
@@ -31,7 +31,7 @@ public class JavaDemo
   private String query;  			//this will hold the query we are using
   private String username, password;
 
-  public JavaDemo()
+  public BetterFuture()
   {
     /*Making a connection to a DB causes certain exceptions.  In order to handle
     these, you either put the DB stuff in a try block or have your function
@@ -147,6 +147,6 @@ public class JavaDemo
 
   public static void main(String args[])
   {
-    JavaDemo demo = new JavaDemo();
+    BetterFuture demo = new BetterFuture();
   }
 }
