@@ -1,23 +1,8 @@
 /*
-    Here is an example of connecting to a database using jdbc
-
-    The table we will use in the example is
-    Table Test(
-       name     varchar(30),
-       ssn      number(10),
-       bday     date
-    );
-    
-    For demostratration purpose, insert two records into this table:
-    ( 'Mike', 123456789, '09/Nov/03' )
-    ( 'Amy', 987654321, '10/Nov/03' )
-
-    Written by: Jonathan Beaver, modified by Thao Pham
-    Purpose: Demo JDBC for CS1555 Class
-
-    IMPORTANT (otherwise, your code may not compile)	
-    Same as using sqlplus, you need to set oracle environment variables by 
-    sourcing bash.env or tcsh.env
+ * Anthony Raehn and Corey Cleric
+ * CS1555
+ * Wild Cats
+ * BetterFuture
  */
 
 import java.util.Scanner;
@@ -27,10 +12,10 @@ import java.sql.*; //import the file containing definitions for the parts
 public class BetterFuture
 {
 	private Connection connection; // used to hold the jdbc connection to the DB
-	private static Statement statement; // used to create an instance of the connection
-	private static ResultSet resultSet; // used to hold the result of your query (if
+	private Statement statement; // used to create an instance of the connection
+	private ResultSet resultSet; // used to hold the result of your query (if
 									// one exists)
-	private static String query; // this will hold the query we are using
+	private String query; // this will hold the query we are using
 	private String pitt_username, pitt_password;
 	
 	private Scanner input;
@@ -52,13 +37,7 @@ public class BetterFuture
 		pitt_password = "3612340"; // This is your password in oracle
 		try
 		{
-			// Register the oracle driver. This needs the oracle files provided
-			// in the oracle.zip file, unzipped into the local directory and
-			// the class path set to include the local directory
 			DriverManager.registerDriver(new oracle.jdbc.driver.OracleDriver());
-			// This is the location of the database. This is the database in
-			// oracle
-			// provided to the class
 			String url = "jdbc:oracle:thin:@class3.cs.pitt.edu:1521:dbclass";
 
 			connection = DriverManager.getConnection(url, pitt_username, pitt_password);
@@ -70,134 +49,223 @@ public class BetterFuture
 					+ Ex.toString());
 			Ex.printStackTrace();
 		}
-		
-		input = new Scanner(System.in);
+		//connected to database, do login stuff now:
 		
 		try
 		{
 			statement = connection.createStatement(); //create an instance
-		}
-		catch (Exception Ex)
-		{
-			System.out.println("Error running the sample queries.  Machine Error: " +
-		            Ex.toString());
-		}
-		
-		/*** Welcome Message ***/
-		System.out.println("Welcome to Better Future's Financial System!\n");
-		
-		/*** User/Admin Login ***/
-		boolean loginSuccess = false;
-		boolean isAdmin = false;
-		
-		System.out.println("To get started, please login to the system (admin or user).");
-		// loop until a user or admin logs in to the system
-		while (!loginSuccess)
-		{
-			// get username
-			System.out.print("Username: ");
-			username = input.nextLine();
 			
-			//get password
-			System.out.print("Password: ");
-			password = input.nextLine();
+			input = new Scanner(System.in);
 			
-			int loginInfo = attemptLogin(username, password);
+			/*** Welcome Message ***/
+			System.out.println("Welcome to Better Future's Financial System!\n");
 			
-			// login failed
-			if (loginInfo == 0)
+			/*** User/Admin Login ***/
+			boolean loginSuccess = false;
+			boolean isAdmin = false;
+			
+			System.out.println("To get started, please login to the system (admin or user).");
+			// loop until a user or admin logs in to the system
+			while (!loginSuccess)
 			{
-				System.out.println("\nERROR: Login unsuccesful. Please try again.\n");
-				loginSuccess = false;
+				// get username
+				System.out.print("Username: ");
+				username = input.nextLine();
+				
+				//get password
+				System.out.print("Password: ");
+				password = input.nextLine();
+				
+				int loginInfo = attemptLogin(username, password);
+				
+				// login failed
+				if (loginInfo == 0)
+				{
+					System.out.println("\nERROR: Login unsuccesful. Please try again.\n");
+					loginSuccess = false;
+				}
+				
+				// user logged in
+				else if (loginInfo == 1)
+				{
+					loginSuccess = true;
+					isAdmin = false;
+				}
+				
+				// admin logged in
+				else if (loginInfo == 2)
+				{
+					loginSuccess = true;
+					isAdmin = true;
+				}
 			}
 			
-			// user logged in
-			else if (loginInfo == 1)
+			// if they get to this point, successfully logged in!
+			
+			char action;
+			/*** if the user is an ADMIN ***/
+			if (isAdmin == true)
 			{
-				loginSuccess = true;
-				isAdmin = false;
+				String str;
+				java.sql.Date date;
+				float fl;
+			    PreparedStatement updateStatement;
+				java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("dd-MMM-yy");
+				boolean done = false;
+				while(!done){
+					System.out.println("\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+					System.out.println("a: Add New Mutual Fund");
+					System.out.println("n: New Customer Registration");
+					System.out.println("s: Update Share Quotes");
+					System.out.println("t: Statistics");
+					System.out.println("d: Update Time and Date");
+					System.out.println("q: Quit");
+					System.out.print("Please select one of the above actions: ");
+					
+					// get first letter of input in lower case
+					action = input.nextLine().toLowerCase().charAt(0);
+					
+					switch (action)
+					{
+						case 'a':
+							//add new mutual fund
+						    query = "INSERT INTO MUTUALFUND VALUES (?,?,?,?,?)";
+						    updateStatement = connection.prepareStatement(query);
+						    
+							System.out.print("Enter a mutual fund symbol: ");
+							str = input.nextLine().toUpperCase();
+						    updateStatement.setString(1, str);
+							System.out.print("Enter a mutual fund name: ");
+							str = input.nextLine();
+						    updateStatement.setString(2, str);
+							System.out.print("Enter a mutual fund description: ");
+							str = input.nextLine();
+						    updateStatement.setString(3, str);
+							System.out.print("Enter a mutual fund category: ");
+							str = input.nextLine();
+						    updateStatement.setString(4, str);
+							System.out.print("Enter a mutual fund date (format: dd-MMM-yy): ");
+							str = input.nextLine();
+						    date = new java.sql.Date (df.parse(str).getTime());
+						    updateStatement.setDate(5, date);
+							
+						    updateStatement.executeUpdate();
+							
+							//check if INSERT applied
+							System.out.println("\nNew table result:");
+							resultSet = mutualFund();
+							while(resultSet.next()){
+								System.out.println(""+
+										resultSet.getString(1) + ", " +
+										resultSet.getString(2) + ", " +
+										resultSet.getString(3) + ", " +
+										resultSet.getString(4) + ", " +
+										resultSet.getDate(5));
+							}
+							break;
+						case 'n':
+							//new customer registration
+						    query = "INSERT INTO CUSTOMER VALUES (?,?,?,?,?,?)";
+						    updateStatement = connection.prepareStatement(query);
+						    
+							System.out.print("Enter a customer login: ");
+							str = input.nextLine();
+						    updateStatement.setString(1, str);
+							System.out.print("Enter a customer name: ");
+							str = input.nextLine();
+						    updateStatement.setString(2, str);
+							System.out.print("Enter a customer email: ");
+							str = input.nextLine();
+						    updateStatement.setString(3, str);
+							System.out.print("Enter a customer address: ");
+							str = input.nextLine();
+						    updateStatement.setString(4, str);
+							System.out.print("Enter a customer password: ");
+							str = input.nextLine();
+						    updateStatement.setString(5, str);
+							System.out.print("Enter a customer balance: ");
+							str = input.nextLine();
+							fl = Float.parseFloat(str);
+						    updateStatement.setFloat(6, fl);
+							
+						    updateStatement.executeUpdate();
+							
+							//check if INSERT applied
+							System.out.println("\nNew table result:");
+							resultSet = customer();
+							while(resultSet.next()){
+								System.out.println(""+
+										resultSet.getString(1) + ", " +
+										resultSet.getString(2) + ", " +
+										resultSet.getString(3) + ", " +
+										resultSet.getString(4) + ", " +
+										resultSet.getString(5) + ", " +
+										resultSet.getFloat(6));
+							}
+							break;
+						case 's':
+							//update share quotes
+							break;
+						case 't':
+							//statistics
+							break;
+						case 'd':
+							//update time and date
+							break;
+						case 'q':
+							done = true;
+							break;
+					}
+				}
 			}
 			
-			// admin logged in
-			else if (loginInfo == 2)
+			/*** if the user is a CUSTOMER ***/
+			if (isAdmin == false)
 			{
-				loginSuccess = true;
-				isAdmin = true;
+				System.out.println("\na: Change Allocation Preferrence");
+				System.out.println("b: Buy Shares");
+				System.out.println("f: Browse Mutual Funds");
+				System.out.println("i: Investing");
+				System.out.println("m: Search Mutual Fund by Text");
+				System.out.println("p: Check Portfolio");
+				System.out.println("s: Sell Shares");
+				System.out.print("Please select one of the above actions: ");
+				
+				// get first letter of input in lower case
+				action = input.nextLine().toLowerCase().charAt(0);
+				
+				switch (action)
+				{
+					case 'a':
+						//allocation preferences
+						break;
+					case 'b':
+						//buy shares
+						break;
+					case 'f':
+						//browse mutual funds
+						break;
+					case 'i':
+						//investing
+						break;
+					case 'm':
+						//search mutual funds by text
+						break;
+					case 'p':
+						//check portfolio
+						break;
+					case 's':
+						//sell shares
+						break;
+				}
 			}
-		}
-		
-		// if they get to this point, successfully logged in!
-		
-		char action;
-		/*** if the user is an ADMIN ***/
-		if (isAdmin == true)
-		{
-			System.out.println("\na: Add New Mutual Fund");
-			System.out.println("n: New Customer Registration");
-			System.out.println("q: Update Share Quotes");
-			System.out.println("s: Statistics");
-			System.out.println("u: Update Time and Date");
-			System.out.print("Please select one of the above actions: ");
-			
-			// get first letter of input in lower case
-			action = input.nextLine().toLowerCase().charAt(0);
-			
-			switch (action)
-			{
-				case 'a':
-					break;
-				case 'n':
-					break;
-				case 'q':
-					break;
-				case 's':
-					break;
-				case 'u':
-					break;
-			}
-		}
-		
-		/*** if the user is a CUSTOMER ***/
-		if (isAdmin == false)
-		{
-			System.out.println("\na: Change Allocation Preferrence");
-			System.out.println("b: Buy Shares");
-			System.out.println("f: Browse Mutual Funds");
-			System.out.println("i: Investing");
-			System.out.println("m: Search Mutual Fund by Text");
-			System.out.println("p: Check Portfolio");
-			System.out.println("s: Sell Shares");
-			System.out.print("Please select one of the above actions: ");
-			
-			// get first letter of input in lower case
-			action = input.nextLine().toLowerCase().charAt(0);
-			
-			switch (action)
-			{
-				case 'a':
-					break;
-				case 'b':
-					break;
-				case 'i':
-					break;
-				case 'm':
-					break;
-				case 'p':
-					break;
-				case 's':
-					break;
-			}
-		}
-		
-		
-		// close the connection
-		try
-		{
+			//done, close the connection
 			connection.close();
+			System.out.println("Connection closed.");
 		}
 		catch (Exception Ex)
 		{
-			System.out.println("Error running the sample queries.  Machine Error: " +
+			System.out.println("Machine Error: " +
 		            Ex.toString());
 		}
 	}
@@ -206,8 +274,44 @@ public class BetterFuture
 	{
 		BetterFuture better_future_session = new BetterFuture();
 	}
-	
-	public static int attemptLogin(String user, String pass)
+
+	public ResultSet mutualFund() throws Exception{
+		statement = connection.createStatement(); //create an instance
+		return statement.executeQuery("SELECT * FROM MUTUALFUND");
+	}
+	public ResultSet closingPrice() throws Exception{
+		statement = connection.createStatement(); //create an instance
+		return statement.executeQuery("SELECT * FROM CLOSINGPRICE");
+	}
+	public ResultSet customer() throws Exception{
+		statement = connection.createStatement(); //create an instance
+		return statement.executeQuery("SELECT * FROM CUSTOMER");
+	}
+	public ResultSet administrator() throws Exception{
+		statement = connection.createStatement(); //create an instance
+		return statement.executeQuery("SELECT * FROM ADMINISTRATOR");
+	}
+	public ResultSet allocation() throws Exception{
+		statement = connection.createStatement(); //create an instance
+		return statement.executeQuery("SELECT * FROM ALLOCATION");
+	}
+	public ResultSet prefers() throws Exception{
+		statement = connection.createStatement(); //create an instance
+		return statement.executeQuery("SELECT * FROM PREFERS");
+	}
+	public ResultSet trxlog() throws Exception{
+		statement = connection.createStatement(); //create an instance
+		return statement.executeQuery("SELECT * FROM TRXLOG");
+	}
+	public ResultSet owns() throws Exception{
+		statement = connection.createStatement(); //create an instance
+		return statement.executeQuery("SELECT * FROM OWNS");
+	}
+	public ResultSet mutualDate() throws Exception{
+		statement = connection.createStatement(); //create an instance
+		return statement.executeQuery("SELECT * FROM MUTUALDATE");
+	}
+	public int attemptLogin(String user, String pass)
 	{
 		try
 		{
