@@ -396,7 +396,7 @@ FOR EACH ROW WHEN (new.action LIKE 'sell')
 DECLARE
 	number_of_shares INT;
 BEGIN
-	-- Update Customer's total balance by added sold shares
+	-- Update Customer's total balance by adding sold shares
 	UPDATE CUSTOMER
 	SET balance = balance + :new.amount
 	WHERE CUSTOMER.login = :new.login;
