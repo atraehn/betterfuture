@@ -7,6 +7,7 @@
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.GregorianCalendar;
 import java.util.Locale;
 import java.util.Scanner;
 import java.sql.*; //import the file containing definitions for the parts
@@ -15,6 +16,7 @@ import java.sql.*; //import the file containing definitions for the parts
 public class BetterFuture {
 	private Connection connection; // used to hold the jdbc connection to the DB
 	private Statement statement; // used to create an instance of the connection
+	private PreparedStatement pStatement;
 	private ResultSet resultSet; // used to hold the result of your query (if
 									// one exists)
 	private String query; // this will hold the query we are using
@@ -38,8 +40,8 @@ public class BetterFuture {
 		 * will use the try blocks
 		 */
 
-		pitt_username = "cmc143"; // This is your username in oracle
-		pitt_password = "3560867"; // This is your password in oracle
+		pitt_username = "atr13"; // This is your username in oracle
+		pitt_password = "3612340"; // This is your password in oracle
 
 		try {
 			DriverManager.registerDriver(new oracle.jdbc.driver.OracleDriver());
@@ -119,10 +121,6 @@ public class BetterFuture {
 		char action;
 		/*** if the user is an ADMIN ***/
 		if (isAdmin == true) {
-			String str;
-			java.sql.Date date;
-			float fl;
-			PreparedStatement updateStatement;
 			boolean done = false;
 			while (!done) {
 				System.out.println("\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
@@ -142,95 +140,30 @@ public class BetterFuture {
 						case 'a':
 						{
 							// add new mutual fund
-							query = "INSERT INTO MUTUALFUND VALUES (?,?,?,?,?)";
-							updateStatement = connection.prepareStatement(query);
-	
-							System.out.print("Enter a mutual fund symbol: ");
-							str = input.nextLine().toUpperCase();
-							updateStatement.setString(1, str);
-							System.out.print("Enter a mutual fund name: ");
-							str = input.nextLine();
-							updateStatement.setString(2, str);
-							System.out.print("Enter a mutual fund description: ");
-							str = input.nextLine();
-							updateStatement.setString(3, str);
-							System.out.print("Enter a mutual fund category: ");
-							str = input.nextLine();
-							updateStatement.setString(4, str);
-							System.out
-									.print("Enter a mutual fund date (format: dd-MMM-yy): ");
-							str = input.nextLine();
-							date = new java.sql.Date(df.parse(str).getTime());
-							updateStatement.setDate(5, date);
-	
-							updateStatement.executeUpdate();
-	
-							// check if INSERT applied
-							System.out.println("\nNew table result:");
-							resultSet = mutualFund();
-							while (resultSet.next()) {
-								System.out.println("" + resultSet.getString(1)
-										+ ", " + resultSet.getString(2) + ", "
-										+ resultSet.getString(3) + ", "
-										+ resultSet.getString(4) + ", "
-										+ resultSet.getDate(5));
-							}
+							addMutualFund();
 							break;
 						}
 						case 'n':
 						{
-							// new customer registration
-							query = "INSERT INTO CUSTOMER VALUES (?,?,?,?,?,?)";
-							updateStatement = connection.prepareStatement(query);
-	
-							System.out.print("Enter a customer login: ");
-							str = input.nextLine();
-							updateStatement.setString(1, str);
-							System.out.print("Enter a customer name: ");
-							str = input.nextLine();
-							updateStatement.setString(2, str);
-							System.out.print("Enter a customer email: ");
-							str = input.nextLine();
-							updateStatement.setString(3, str);
-							System.out.print("Enter a customer address: ");
-							str = input.nextLine();
-							updateStatement.setString(4, str);
-							System.out.print("Enter a customer password: ");
-							str = input.nextLine();
-							updateStatement.setString(5, str);
-							System.out.print("Enter a customer balance: ");
-							str = input.nextLine();
-							fl = Float.parseFloat(str);
-							updateStatement.setFloat(6, fl);
-	
-							updateStatement.executeUpdate();
-	
-							// check if INSERT applied
-							System.out.println("\nNew table result:");
-							resultSet = customer();
-							while (resultSet.next()) {
-								System.out.println("" + resultSet.getString(1)
-										+ ", " + resultSet.getString(2) + ", "
-										+ resultSet.getString(3) + ", "
-										+ resultSet.getString(4) + ", "
-										+ resultSet.getString(5) + ", "
-										+ resultSet.getFloat(6));
-							}
+							addCustomer();
 							break;
 						}
 						case 's':
 						{
 							// update share quotes
+							addQuotes();
 							break;
 						}
 						case 't':
 						{
 							// statistics
+							getStats();
 							break;
 						}
 						case 'd':
 						{
 							// update time and date
+							updateDate();
 							break;
 						}
 						case 'q':
@@ -239,20 +172,15 @@ public class BetterFuture {
 							break;
 						}
 					}
-				} catch (java.sql.SQLIntegrityConstraintViolationException ic) {
-					System.out.println("" + ic.getMessage());
-					action = 'x';
 				} catch (Exception Ex) {
 					System.out.println("Machine Error: " + Ex.toString());
+					action = 'x';
 				}
 			}
 		}
 
 		/*** if the user is a CUSTOMER ***/
 		if (isAdmin == false) {
-			String str;
-			java.sql.Date date;
-			java.text.SimpleDateFormat df = new java.text.SimpleDateFormat("dd-MMM-yy");
 			boolean done = false;
 			while (!done)
 			{
@@ -393,7 +321,235 @@ public class BetterFuture {
 		statement = connection.createStatement(); // create an instance
 		return statement.executeQuery("SELECT * FROM MUTUALDATE");
 	}
+	
+	public void addMutualFund() throws Exception{
+		String str;
+		java.sql.Date date;
+		query = "INSERT INTO MUTUALFUND VALUES (?,?,?,?,?)";
+		pStatement = connection.prepareStatement(query);
 
+		System.out.print("Enter a mutual fund symbol: ");
+		str = input.nextLine().toUpperCase();
+		pStatement.setString(1, str);
+		System.out.print("Enter a mutual fund name: ");
+		str = input.nextLine();
+		pStatement.setString(2, str);
+		System.out.print("Enter a mutual fund description: ");
+		str = input.nextLine();
+		pStatement.setString(3, str);
+		System.out.print("Enter a mutual fund category: ");
+		str = input.nextLine();
+		pStatement.setString(4, str);
+		System.out
+				.print("Enter a mutual fund date (format: dd-MMM-yy): ");
+		str = input.nextLine();
+		date = new java.sql.Date(df.parse(str).getTime());
+		pStatement.setDate(5, date);
+
+		pStatement.executeUpdate();
+
+		// check if INSERT applied
+		System.out.println("\nNew table result:");
+		resultSet = mutualFund();
+		while (resultSet.next()) {
+			System.out.println("" + resultSet.getString(1)
+					+ ", " + resultSet.getString(2) + ", "
+					+ resultSet.getString(3) + ", "
+					+ resultSet.getString(4) + ", "
+					+ resultSet.getDate(5));
+		}
+	}
+	
+	public void addCustomer() throws Exception{
+		String str;
+		float fl;
+		// new customer registration
+		query = "INSERT INTO CUSTOMER VALUES (?,?,?,?,?,?)";
+		pStatement = connection.prepareStatement(query);
+
+		System.out.print("Enter a customer login: ");
+		str = input.nextLine();
+		pStatement.setString(1, str);
+		System.out.print("Enter a customer name: ");
+		str = input.nextLine();
+		pStatement.setString(2, str);
+		System.out.print("Enter a customer email: ");
+		str = input.nextLine();
+		pStatement.setString(3, str);
+		System.out.print("Enter a customer address: ");
+		str = input.nextLine();
+		pStatement.setString(4, str);
+		System.out.print("Enter a customer password: ");
+		str = input.nextLine();
+		pStatement.setString(5, str);
+		System.out.print("Enter a customer balance: ");
+		str = input.nextLine();
+		fl = Float.parseFloat(str);
+		pStatement.setFloat(6, fl);
+
+		pStatement.executeUpdate();
+
+		// check if INSERT applied
+		System.out.println("\nNew table result:");
+		resultSet = customer();
+		while (resultSet.next()) {
+			System.out.println("" + resultSet.getString(1)
+					+ ", " + resultSet.getString(2) + ", "
+					+ resultSet.getString(3) + ", "
+					+ resultSet.getString(4) + ", "
+					+ resultSet.getString(5) + ", "
+					+ resultSet.getFloat(6));
+		}
+	}
+	
+	public void addQuotes() throws Exception{
+		String str;
+		float fl;
+		java.sql.Date date = null;
+		ArrayList<String> symlist = new ArrayList<String>();
+		
+		//build symlist from mutualfund symbols
+		resultSet = mutualFund();
+		while (resultSet.next()) {
+			symlist.add(resultSet.getString(1));
+		}
+		
+		// date= c_date from MUTUALDATE
+		resultSet = mutualDate();
+		while (resultSet.next()) {
+			date=resultSet.getDate(1);
+		}
+		for(String s : symlist){
+			query = "SELECT * " +
+					"FROM (SELECT * " +
+							"FROM CLOSINGPRICE " +
+							"WHERE symbol=? " +
+							"ORDER BY p_date DESC) " +
+					"WHERE rownum=1";
+			pStatement = connection.prepareStatement(query);
+			pStatement.setString(1, s);
+			resultSet = pStatement.executeQuery();
+			resultSet.next();
+			System.out.println("Latest quote for " 
+					+ resultSet.getString(1)+ ": "
+					+ resultSet.getFloat(2) + ", "
+					+ resultSet.getDate(3));
+			//date == MUTUALDATE(c_date)
+			if(date.equals(resultSet.getDate(3))){
+				System.out.println("The latest quote for "+s+" is from " +
+								"our DB's current date! (Skipping)");
+				continue;
+			}else{
+				//today = MUTUALDATE(c_date)
+				query = "INSERT INTO CLOSINGPRICE VALUES (?,?,?)";
+				pStatement = connection.prepareStatement(query);
+				System.out.print("Enter today's quote for "+s+": ");
+				str = input.nextLine();
+				fl = Float.parseFloat(str);
+				pStatement.setString(1, s);
+				pStatement.setFloat(2, fl);
+				pStatement.setDate(3, date);
+
+				pStatement.executeUpdate();
+			}
+		}
+	}
+
+	public void getStats() throws Exception{
+		java.sql.Date date;
+		java.util.Date cdate = new java.util.Date();
+		java.util.Calendar cal = GregorianCalendar.getInstance();
+		String str;
+		int x,k;
+		
+		cal.setTime(cdate);
+		System.out.print("Enter number of past months:");
+		str = input.nextLine();
+		x = -1*Integer.parseInt(str);
+		cal.add(GregorianCalendar.MONTH, x);
+		date = new java.sql.Date(cal.getTimeInMillis());
+
+		System.out.print("\nEnter number of top shares sold transactions: ");
+		str = input.nextLine();
+		k = Integer.parseInt(str);
+		
+		query=	"SELECT * " +
+				"FROM (SELECT * " +
+						"FROM TRXLOG " +
+						"WHERE action='sell' AND t_date>=? " +
+						"ORDER BY num_shares DESC) " +
+				"WHERE ROWNUM <=?";
+		pStatement = connection.prepareStatement(query);
+		pStatement.setDate(1, date);
+		pStatement.setInt(2, k);
+		resultSet = pStatement.executeQuery();
+		System.out.format("\n%10s %10s %10s %10s %10s %10s %10s %10s\n",
+				"TransID","Login","Sym","Date","Action","Shares","Price","Amt");
+		while(resultSet.next()){
+			System.out.format("%10s %10s %10s %10s %10s %10s %10s %10s\n",
+								resultSet.getInt(1),
+								resultSet.getString(2),
+								resultSet.getString(3),
+								resultSet.getDate(4),
+								resultSet.getString(5),
+								resultSet.getInt(6),
+								resultSet.getFloat(7),
+								resultSet.getFloat(8));
+		}
+
+		System.out.print("\nEnter number of top investments: ");
+		str = input.nextLine();
+		k = Integer.parseInt(str);
+		
+		query=	"SELECT * " +
+				"FROM (SELECT * " +
+						"FROM TRXLOG " +
+						"WHERE action='buy' AND t_date>=? " +
+						"ORDER BY num_shares DESC) " +
+				"WHERE ROWNUM <=?";
+		pStatement = connection.prepareStatement(query);
+		pStatement.setDate(1, date);
+		pStatement.setInt(2, k);
+		resultSet = pStatement.executeQuery();
+		System.out.format("\n%10s %10s %10s %10s %10s %10s %10s %10s\n",
+						"ID","Login","Sym","Date","Action","Shares","Price","Amt");
+		while(resultSet.next()){
+			System.out.format("%10s %10s %10s %10s %10s %10s %10s %10s\n",
+								resultSet.getInt(1),
+								resultSet.getString(2),
+								resultSet.getString(3),
+								resultSet.getDate(4),
+								resultSet.getString(5),
+								resultSet.getInt(6),
+								resultSet.getFloat(7),
+								resultSet.getFloat(8));
+		}
+	}
+	
+	public void updateDate() throws Exception{
+		//current date:
+		String str;
+		java.sql.Date cdate = new java.sql.Date(new java.util.Date().getTime());
+		
+		query = "UPDATE MUTUALDATE SET c_date=?";
+		pStatement = connection.prepareStatement(query);
+
+		System.out.print("Enter a date (format: dd-MMM-yy): ");
+		str = input.nextLine();
+		//if admin entered a date to set:
+		if(str.length()>0) cdate = new java.sql.Date(df.parse(str).getTime());
+		//else use current date
+		pStatement.setDate(1, cdate);
+		
+		pStatement.executeUpdate();
+
+		System.out.println("\nNew table result:");
+		resultSet = mutualDate();
+		while (resultSet.next()) {
+			System.out.println("" + resultSet.getDate(1));
+		}
+	}
+	
 	public int attemptLogin(String user, String pass) {
 		try {
 			// query CUSTOMER table
@@ -439,7 +595,7 @@ public class BetterFuture {
 	{
 		try
 		{
-			PreparedStatement updateStatement;
+			//PreparedStatement updateStatement;
 			
 			// get category
 			System.out.println("\nHow would you like to browse the mutual funds?\nBy:");
@@ -577,7 +733,7 @@ public class BetterFuture {
 	{
 		try
 		{
-			PreparedStatement updateStatement;
+			//PreparedStatement updateStatement;
 			
 			System.out.print("Enter (up to 2) keywords to search mutual funds by.\n"
 					+ "Deliminate keywords by a space: ");
@@ -656,7 +812,7 @@ public class BetterFuture {
 	{
 		try
 		{
-			PreparedStatement updateStatement;
+			//PreparedStatement updateStatement;
 			
 			System.out.print("\nEnter a date to create portfolio against ('DD-MMM-YY'): ");
 			String currDate = input.nextLine().toUpperCase();
@@ -714,7 +870,7 @@ public class BetterFuture {
 	{
 		try
 		{
-			PreparedStatement updateStatement;
+			//PreparedStatement updateStatement;
 			
 			System.out.print("\nPlease enter an amount to deposit for investment (-1 to cancel): ");
 			float depositAmount = Float.parseFloat(input.nextLine());
@@ -743,18 +899,18 @@ public class BetterFuture {
 			
 			// INSERT deposit to TRXLOG
 			query = "INSERT INTO TRXLOG VALUES (?,?,?,?,?,?,?,?)";
-			updateStatement = connection.prepareStatement(query);
+			pStatement = connection.prepareStatement(query);
 			
-			updateStatement.setInt(1, newTransID);
-			updateStatement.setString(2, username);
-			updateStatement.setString(3, null);
-			updateStatement.setDate(4, mutualDate);
-			updateStatement.setString(5, "deposit");
-			updateStatement.setString(6, null);
-			updateStatement.setString(7, null);
-			updateStatement.setFloat(8, depositAmount);
+			pStatement.setInt(1, newTransID);
+			pStatement.setString(2, username);
+			pStatement.setString(3, null);
+			pStatement.setDate(4, mutualDate);
+			pStatement.setString(5, "deposit");
+			pStatement.setString(6, null);
+			pStatement.setString(7, null);
+			pStatement.setFloat(8, depositAmount);
 			
-			updateStatement.executeUpdate();
+			pStatement.executeUpdate();
 			
 			// trigger takes care of rest!
 			
@@ -780,7 +936,7 @@ public class BetterFuture {
 	{
 		try
 		{
-			PreparedStatement updateStatement;
+			//PreparedStatement updateStatement;
 			
 			float sharePrice = 0.0f;
 			float userBalance = 0.0f;
@@ -872,18 +1028,18 @@ public class BetterFuture {
 				
 				// INSERT buy to TRXLOG
 				query = "INSERT INTO TRXLOG VALUES (?,?,?,?,?,?,?,?)";
-				updateStatement = connection.prepareStatement(query);
+				pStatement = connection.prepareStatement(query);
 				
-				updateStatement.setInt(1, newTransID);
-				updateStatement.setString(2, username);
-				updateStatement.setString(3, symbolToBuy);
-				updateStatement.setDate(4, mutualDate);
-				updateStatement.setString(5, "buy");
-				updateStatement.setInt(6, numToBuy);
-				updateStatement.setFloat(7, sharePrice);
-				updateStatement.setFloat(8, (numToBuy*sharePrice));
+				pStatement.setInt(1, newTransID);
+				pStatement.setString(2, username);
+				pStatement.setString(3, symbolToBuy);
+				pStatement.setDate(4, mutualDate);
+				pStatement.setString(5, "buy");
+				pStatement.setInt(6, numToBuy);
+				pStatement.setFloat(7, sharePrice);
+				pStatement.setFloat(8, (numToBuy*sharePrice));
 				
-				updateStatement.executeUpdate();
+				pStatement.executeUpdate();
 				
 				// add shares to OWNS
 				query = "SELECT * FROM OWNS WHERE login = '" + username
@@ -894,37 +1050,37 @@ public class BetterFuture {
 				if (!resultSet.next())
 				{
 					query = "INSERT INTO OWNS VALUES (?,?,?)";
-					updateStatement = connection.prepareStatement(query);
+					pStatement = connection.prepareStatement(query);
 					
-					updateStatement.setString(1, username);
-					updateStatement.setString(2, symbolToBuy);
-					updateStatement.setInt(3, numToBuy);
+					pStatement.setString(1, username);
+					pStatement.setString(2, symbolToBuy);
+					pStatement.setInt(3, numToBuy);
 					
-					updateStatement.executeUpdate();
+					pStatement.executeUpdate();
 				}
 				// user already owns some shares, UPDATE
 				else
 				{
 					query = "UPDATE OWNS SET shares = shares + ? "
 							+ " WHERE login = ? AND SYMBOL = ?";
-					updateStatement = connection.prepareStatement(query);
+					pStatement = connection.prepareStatement(query);
 					
-					updateStatement.setInt(1, numToBuy);
-					updateStatement.setString(2, username);
-					updateStatement.setString(3, symbolToBuy);
+					pStatement.setInt(1, numToBuy);
+					pStatement.setString(2, username);
+					pStatement.setString(3, symbolToBuy);
 					
-					updateStatement.executeUpdate();
+					pStatement.executeUpdate();
 				}
 				
 				//subtract transaction from customer balance
 				query = "UPDATE CUSTOMER SET balance = balance - ? "
 						+ " WHERE login = ?";
-				updateStatement = connection.prepareStatement(query);
+				pStatement = connection.prepareStatement(query);
 				
-				updateStatement.setFloat(1, (numToBuy*sharePrice));
-				updateStatement.setString(2, username);
+				pStatement.setFloat(1, (numToBuy*sharePrice));
+				pStatement.setString(2, username);
 				
-				updateStatement.executeUpdate();
+				pStatement.executeUpdate();
 				
 			}
 			
@@ -964,18 +1120,18 @@ public class BetterFuture {
 				
 				// INSERT buy to TRXLOG
 				query = "INSERT INTO TRXLOG VALUES (?,?,?,?,?,?,?,?)";
-				updateStatement = connection.prepareStatement(query);
+				pStatement = connection.prepareStatement(query);
 				
-				updateStatement.setInt(1, newTransID);
-				updateStatement.setString(2, username);
-				updateStatement.setString(3, symbolToBuy);
-				updateStatement.setDate(4, mutualDate);
-				updateStatement.setString(5, "buy");
-				updateStatement.setInt(6, numToBuy);
-				updateStatement.setFloat(7, sharePrice);
-				updateStatement.setFloat(8, (numToBuy*sharePrice));
+				pStatement.setInt(1, newTransID);
+				pStatement.setString(2, username);
+				pStatement.setString(3, symbolToBuy);
+				pStatement.setDate(4, mutualDate);
+				pStatement.setString(5, "buy");
+				pStatement.setInt(6, numToBuy);
+				pStatement.setFloat(7, sharePrice);
+				pStatement.setFloat(8, (numToBuy*sharePrice));
 				
-				updateStatement.executeUpdate();
+				pStatement.executeUpdate();
 				
 				// add shares to OWNS
 				query = "SELECT * FROM OWNS WHERE login = '" + username
@@ -986,37 +1142,37 @@ public class BetterFuture {
 				if (!resultSet.next())
 				{
 					query = "INSERT INTO OWNS VALUES (?,?,?)";
-					updateStatement = connection.prepareStatement(query);
+					pStatement = connection.prepareStatement(query);
 					
-					updateStatement.setString(1, username);
-					updateStatement.setString(2, symbolToBuy);
-					updateStatement.setInt(3, numToBuy);
+					pStatement.setString(1, username);
+					pStatement.setString(2, symbolToBuy);
+					pStatement.setInt(3, numToBuy);
 					
-					updateStatement.executeUpdate();
+					pStatement.executeUpdate();
 				}
 				// user already owns some shares, UPDATE
 				else
 				{
 					query = "UPDATE OWNS SET shares = shares + ? "
 							+ " WHERE login = ? AND SYMBOL = ?";
-					updateStatement = connection.prepareStatement(query);
+					pStatement = connection.prepareStatement(query);
 					
-					updateStatement.setInt(1, numToBuy);
-					updateStatement.setString(2, username);
-					updateStatement.setString(3, symbolToBuy);
+					pStatement.setInt(1, numToBuy);
+					pStatement.setString(2, username);
+					pStatement.setString(3, symbolToBuy);
 					
-					updateStatement.executeUpdate();
+					pStatement.executeUpdate();
 				}
 				
 				//update customer balance
 				query = "UPDATE CUSTOMER SET balance = balance - ? "
 						+ " WHERE login = ?";
-				updateStatement = connection.prepareStatement(query);
+				pStatement = connection.prepareStatement(query);
 				
-				updateStatement.setFloat(1, (numToBuy*sharePrice));
-				updateStatement.setString(2, username);
+				pStatement.setFloat(1, (numToBuy*sharePrice));
+				pStatement.setString(2, username);
 				
-				updateStatement.executeUpdate();
+				pStatement.executeUpdate();
 			}
 		}
 		catch (java.sql.SQLIntegrityConstraintViolationException ic)
@@ -1037,7 +1193,7 @@ public class BetterFuture {
 	{
 		try
 		{
-			PreparedStatement updateStatement;
+			//PreparedStatement updateStatement;
 			ArrayList<String> symbolsOwned = new ArrayList<String>();
 			String symbolToSell;
 			
@@ -1127,18 +1283,18 @@ public class BetterFuture {
 			
 			// INSERT buy to TRXLOG
 			query = "INSERT INTO TRXLOG VALUES (?,?,?,?,?,?,?,?)";
-			updateStatement = connection.prepareStatement(query);
+			pStatement = connection.prepareStatement(query);
 			
-			updateStatement.setInt(1, newTransID);
-			updateStatement.setString(2, username);
-			updateStatement.setString(3, symbolToSell);
-			updateStatement.setDate(4, mutualDate);
-			updateStatement.setString(5, "sell");
-			updateStatement.setInt(6, numToSell);
-			updateStatement.setFloat(7, sharePrice);
-			updateStatement.setFloat(8, (numToSell*sharePrice));
+			pStatement.setInt(1, newTransID);
+			pStatement.setString(2, username);
+			pStatement.setString(3, symbolToSell);
+			pStatement.setDate(4, mutualDate);
+			pStatement.setString(5, "sell");
+			pStatement.setInt(6, numToSell);
+			pStatement.setFloat(7, sharePrice);
+			pStatement.setFloat(8, (numToSell*sharePrice));
 			
-			updateStatement.executeUpdate();
+			pStatement.executeUpdate();
 			
 			// trigger takes care of rest!
 			
@@ -1165,7 +1321,7 @@ public class BetterFuture {
 	{
 		try
 		{
-			PreparedStatement updateStatement;
+			//PreparedStatement updateStatement;
 			
 			// get the user's current preferences						
 			query = "SELECT symbol, percentage, p_date FROM "
@@ -1263,25 +1419,25 @@ public class BetterFuture {
 					
 					// add new alloc_num to ALLOCATION
 					query = "INSERT INTO ALLOCATION VALUES (?,?,?)";
-					updateStatement = connection.prepareStatement(query);
+					pStatement = connection.prepareStatement(query);
 					
-					updateStatement.setInt(1, allocNum);
-					updateStatement.setString(2, username);
-					updateStatement.setDate(3, mutualDate);
+					pStatement.setInt(1, allocNum);
+					pStatement.setString(2, username);
+					pStatement.setDate(3, mutualDate);
 					
-					updateStatement.executeUpdate();
+					pStatement.executeUpdate();
 					
 					query = "INSERT INTO PREFERS VALUES (?,?,?)";
-					updateStatement = connection.prepareStatement(query);
+					pStatement = connection.prepareStatement(query);
 					
 					// loop through and add new symbols to PREFERS
 					for (int i = 0; i < newSymbols.size(); i++)
 					{
-						updateStatement.setInt(1, allocNum);
-						updateStatement.setString(2, newSymbols.get(i));
-						updateStatement.setFloat(3, newPercentages.get(i));
+						pStatement.setInt(1, allocNum);
+						pStatement.setString(2, newSymbols.get(i));
+						pStatement.setFloat(3, newPercentages.get(i));
 						
-						updateStatement.executeUpdate();
+						pStatement.executeUpdate();
 					}
 					
 				}
