@@ -108,6 +108,7 @@ CONSTRAINT MUTUALDATE_PK PRIMARY KEY (c_date) INITIALLY IMMEDIATE DEFERRABLE
 ---------------------------TABLES ABOVE--------------------------------
 -----------------------------------------------------------------------
 
+--ALTER SESSION SET ISOLATION_LEVEL = READ COMMITTED;
 
 -----------------------------------------------------------------------
 ---------------------------INSERTS BELOW-------------------------------

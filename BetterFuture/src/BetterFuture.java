@@ -40,8 +40,8 @@ public class BetterFuture {
 		 * will use the try blocks
 		 */
 
-		pitt_username = "atr13"; // This is your username in oracle
-		pitt_password = "3612340"; // This is your password in oracle
+		pitt_username = "cmc143"; // This is your username in oracle
+		pitt_password = "3560867"; // This is your password in oracle
 
 		try {
 			DriverManager.registerDriver(new oracle.jdbc.driver.OracleDriver());
@@ -454,75 +454,47 @@ public class BetterFuture {
 			}
 		}
 	}
-
+	
 	public void getStats() throws Exception{
-		java.sql.Date date;
-		java.util.Date cdate = new java.util.Date();
-		java.util.Calendar cal = GregorianCalendar.getInstance();
-		String str;
-		int x,k;
 		
-		cal.setTime(cdate);
-		System.out.print("Enter number of past months:");
-		str = input.nextLine();
-		x = -1*Integer.parseInt(str);
-		cal.add(GregorianCalendar.MONTH, x);
-		date = new java.sql.Date(cal.getTimeInMillis());
+		// get input from user
+		System.out.print("Enter number of months to get statistics for: ");
+		int numMonths = Integer.parseInt(input.nextLine());
+		System.out.print("Enter the number of categories for highest volume statistics: ");
+		int numCategories = Integer.parseInt(input.nextLine());
+		System.out.print("Enter the number of investors to get the highest invested statistics: ");
+		int numInvestors = Integer.parseInt(input.nextLine());
 
-		System.out.print("\nEnter number of top shares sold transactions: ");
-		str = input.nextLine();
-		k = Integer.parseInt(str);
+		// retrieve highest volume categories (highest count of shares sold):
+		query = "SELECT * FROM (SELECT M.category, SUM(T.num_shares) "
+				+ "FROM TRXLOG T JOIN MUTUALFUND M ON T.symbol = M.symbol "
+				+ "WHERE T.action = 'sell' AND T.t_date >= ADD_MONTHS((SELECT * FROM MUTUALDATE), -"
+				+ numMonths + ") GROUP BY M.category ORDER BY SUM(T.num_shares) DESC) "
+				+ "WHERE ROWNUM < " + (numCategories + 1);
+
 		
-		query=	"SELECT * " +
-				"FROM (SELECT * " +
-						"FROM TRXLOG " +
-						"WHERE action='sell' AND t_date>=? " +
-						"ORDER BY num_shares DESC) " +
-				"WHERE ROWNUM <=?";
-		pStatement = connection.prepareStatement(query);
-		pStatement.setDate(1, date);
-		pStatement.setInt(2, k);
-		resultSet = pStatement.executeQuery();
-		System.out.format("\n%10s %10s %10s %10s %10s %10s %10s %10s\n",
-				"TransID","Login","Sym","Date","Action","Shares","Price","Amt");
-		while(resultSet.next()){
-			System.out.format("%10s %10s %10s %10s %10s %10s %10s %10s\n",
-								resultSet.getInt(1),
-								resultSet.getString(2),
-								resultSet.getString(3),
-								resultSet.getDate(4),
-								resultSet.getString(5),
-								resultSet.getInt(6),
-								resultSet.getFloat(7),
-								resultSet.getFloat(8));
+		resultSet = statement.executeQuery(query);
+		
+		System.out.format("\n%-14s %-14s\n", "Category", "Shares Sold");
+		System.out.format("%-14s %-14s\n", "~~~~~~~~~~", "~~~~~~~~~~");
+		while(resultSet.next())
+		{
+			System.out.format("%-14s %-14s\n", resultSet.getString(1), resultSet.getInt(2));
 		}
 
-		System.out.print("\nEnter number of top investments: ");
-		str = input.nextLine();
-		k = Integer.parseInt(str);
+		// retrieve investors with highest amount invested
+		query = "SELECT login, SUM(O.shares * C.price) AS total FROM OWNS O JOIN "
+				+ "CLOSINGPRICE C ON O.symbol = C.symbol WHERE O.symbol = C.symbol "
+				+ "AND p_date = (SELECT MAX(p_date) FROM CLOSINGPRICE WHERE symbol = O.symbol)"
+				+ " AND ROWNUM < " + (numInvestors +1) + " GROUP BY login";
+
+		resultSet = statement.executeQuery(query);
 		
-		query=	"SELECT * " +
-				"FROM (SELECT * " +
-						"FROM TRXLOG " +
-						"WHERE action='buy' AND t_date>=? " +
-						"ORDER BY num_shares DESC) " +
-				"WHERE ROWNUM <=?";
-		pStatement = connection.prepareStatement(query);
-		pStatement.setDate(1, date);
-		pStatement.setInt(2, k);
-		resultSet = pStatement.executeQuery();
-		System.out.format("\n%10s %10s %10s %10s %10s %10s %10s %10s\n",
-						"ID","Login","Sym","Date","Action","Shares","Price","Amt");
-		while(resultSet.next()){
-			System.out.format("%10s %10s %10s %10s %10s %10s %10s %10s\n",
-								resultSet.getInt(1),
-								resultSet.getString(2),
-								resultSet.getString(3),
-								resultSet.getDate(4),
-								resultSet.getString(5),
-								resultSet.getInt(6),
-								resultSet.getFloat(7),
-								resultSet.getFloat(8));
+		System.out.format("\n%-14s %-14s\n", "User", "Total Invested");
+		System.out.format("%-14s %-14s\n", "~~~~~~~~~~", "~~~~~~~~~~");
+		while(resultSet.next())
+		{
+			System.out.format("%-14s %-14s\n", resultSet.getString(1), resultSet.getInt(2));
 		}
 	}
 	
@@ -834,8 +806,6 @@ public class BetterFuture {
 				return;
 			}
 			
-			query = "SELECT O.symbols, C.prices, O.shares FROM CLOSINGPRICE WHERE p_date = '" + currDate + "'";
-			
 			//For a specific date, the report will list the mutual funds the customer owns shares of:
 			//their symbols, their prices, the number of shares, their current values on the specific
 			//date, the cost value and the yield as well as the total value of the portfolio.
@@ -845,11 +815,61 @@ public class BetterFuture {
 			ArrayList <Integer> ownedShares = new ArrayList<Integer>();
 			ArrayList <Float> currentValues = new ArrayList<Float>();
 			ArrayList <Float> costValues = new ArrayList<Float>();
-			ArrayList <Float> adjustedCosts = new ArrayList<Float>();
 			ArrayList <Float> yields = new ArrayList<Float>();
-			float totalValue = 0.0f;
+			float totalYield = 0.0f;
 			
+			// query values where user INPUT date
+			query = "SELECT O.symbol, C.price, O.shares FROM "
+					+ "(OWNS O JOIN CLOSINGPRICE C ON O.symbol = C.symbol) "
+					+ "WHERE C.p_date = '" + currDate + "' AND O.login = '" + username + "'";
 			
+			resultSet = statement.executeQuery(query);
+			
+			// get symbols, prices, shares, and currentValues of owned mutual funds of user
+			while (resultSet.next())
+			{
+				ownedSymbols.add(resultSet.getString(1));
+				ownedPrices.add(resultSet.getFloat(2));
+				ownedShares.add(resultSet.getInt(3));
+				currentValues.add(resultSet.getFloat(2) * resultSet.getInt(3));
+			}
+			
+			// get price on mutual date
+			query = "SELECT C.price FROM "
+					+ "(OWNS O JOIN CLOSINGPRICE C ON O.symbol = C.symbol) "
+					+ "WHERE C.p_date = (SELECT MAX(p_date) FROM CLOSINGPRICE) AND O.login = '" + username + "'";
+			
+			resultSet = statement.executeQuery(query);
+			
+			// get prices of mutualDate
+			int j = 0;
+			while (resultSet.next())
+			{
+				costValues.add(resultSet.getFloat(1) * ownedShares.get(j));
+				j++;
+			}
+			
+			// calculate yields
+			for (int i = 0; i < currentValues.size(); i++)
+			{
+				yields.add(currentValues.get(i) - costValues.get(i));
+				totalYield += yields.get(i);
+			}
+			
+			// output results
+			
+			System.out.println("\nCustomer " + username + "'s Porfolio for date: " + mutualDate);
+			System.out.format("\n%-14s %-14s %-14s %-14s %-14s %-14s",
+					"Symbol","Price on date","# Shares","Current Value","Cost Value","Yield");
+			
+			for (int i = 0; i < ownedSymbols.size(); i ++)
+			{
+				System.out.format("\n%-14s %-14s %-14s %-14s %-14s %-14s\n",
+						ownedSymbols.get(i),ownedPrices.get(i),ownedShares.get(i),
+						currentValues.get(i),costValues.get(i),yields.get(i));
+			}
+			
+			System.out.println("\nTotal Yield of Portfolio: $" + totalYield + "\n");
 			
 		}
 		catch (java.sql.SQLIntegrityConstraintViolationException ic)
@@ -970,7 +990,7 @@ public class BetterFuture {
 				return;
 			}
 			
-			// get the stock's current preferences				
+			// get the user's current balance				
 			query = "SELECT balance FROM CUSTOMER WHERE login = '" + username + "'";
 			resultSet = statement.executeQuery(query);
 			
@@ -1024,6 +1044,37 @@ public class BetterFuture {
 				if (resultSet.next())
 				{
 					newTransID = resultSet.getInt(1) + 1;
+				}
+				
+				/*** recalculate values before touching tables ***/
+				// get stock's closing price and user balance again to check			
+				query = "SELECT price, balance FROM "
+				+ "(MUTUALFUND M JOIN CLOSINGPRICE C ON M.symbol = C.symbol), CUSTOMER U "
+				+ "WHERE C.p_date = (SELECT MAX(p_date) FROM CLOSINGPRICE "
+				+ "WHERE symbol = '" + symbolToBuy + "') AND C.symbol = '" + symbolToBuy + "'"
+						+ " AND login = '" + username + "'";
+				resultSet = statement.executeQuery(query);
+				float newestBalance = 0.0f;
+				float newestPrice = 0.0f;
+				// put balance into variable
+				if (resultSet.next())
+				{
+					newestPrice = resultSet.getFloat(1);
+					newestBalance = resultSet.getFloat(2);
+				}
+				
+				// making sure user didn't login multiple times, etc.
+				if (newestBalance != userBalance)
+				{
+					System.out.println("\nERROR! Sorry your balance has changed since the start of this transaction.\n");
+					return;
+				}
+				
+				// making sure admin didn't update share price
+				if (newestPrice != sharePrice)
+				{
+					System.out.println("\nERROR! Sorry the share price has been updated since the start of this transaction.\n");
+					return;
 				}
 				
 				// INSERT buy to TRXLOG
@@ -1116,6 +1167,37 @@ public class BetterFuture {
 				if (resultSet.next())
 				{
 					newTransID = resultSet.getInt(1) + 1;
+				}
+				
+				/*** recalculate values before touching tables ***/
+				// get stock's closing price and user balance again to check			
+				query = "SELECT price, balance FROM "
+				+ "(MUTUALFUND M JOIN CLOSINGPRICE C ON M.symbol = C.symbol), CUSTOMER U "
+				+ "WHERE C.p_date = (SELECT MAX(p_date) FROM CLOSINGPRICE "
+				+ "WHERE symbol = '" + symbolToBuy + "') AND C.symbol = '" + symbolToBuy + "'"
+						+ " AND login = '" + username + "'";
+				resultSet = statement.executeQuery(query);
+				float newestBalance = 0.0f;
+				float newestPrice = 0.0f;
+				// put balance into variable
+				if (resultSet.next())
+				{
+					newestPrice = resultSet.getFloat(1);
+					newestBalance = resultSet.getFloat(2);
+				}
+				
+				// making sure user didn't login multiple times, etc.
+				if (newestBalance != userBalance)
+				{
+					System.out.println("\nERROR! Sorry your balance has changed since the start of this transaction.\n");
+					return;
+				}
+				
+				// making sure admin didn't update share price
+				if (newestPrice != sharePrice)
+				{
+					System.out.println("\nERROR! Sorry the share price has been updated since the start of this transaction.\n");
+					return;
 				}
 				
 				// INSERT buy to TRXLOG
@@ -1279,6 +1361,24 @@ public class BetterFuture {
 			if (resultSet.next())
 			{
 				newTransID = resultSet.getInt(1) + 1;
+			}
+			
+			/*** recalculate values before touching tables ***/
+			// get the number of shares again before update		
+			query = "SELECT shares FROM OWNS WHERE login = '" + username
+					+ "' AND symbol = '" + symbolToSell + "'";
+			resultSet = statement.executeQuery(query);
+			int newestNumShares = 0;
+			if (resultSet.next())
+			{
+				newestNumShares = resultSet.getInt(1);
+			}
+			
+			// making sure user didn't login multiple times, etc.
+			if (newestNumShares != numSharesOwned)
+			{
+				System.out.println("\nERROR! Sorry your number of shares has changed since the start of this transaction.\n");
+				return;
 			}
 			
 			// INSERT buy to TRXLOG
